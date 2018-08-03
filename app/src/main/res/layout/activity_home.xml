@@ -17,4 +17,23 @@
         android:textSize="32sp"
         android:textStyle="bold" />
 
+
+    <ImageView
+        android:id="@+id/iv_wifi"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:layout_margin="20dp"
+        android:contentDescription="show wifi status"
+        android:src="@drawable/shape_circle_button" />
+
+    <TextView
+
+        android:id="@+id/tv_wifi"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBaseline="@id/iv_wifi"
+        android:layout_below="@id/iv_wifi"
+        tools:text="wzkj" />
 </RelativeLayout>
