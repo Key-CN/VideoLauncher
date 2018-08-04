@@ -24,16 +24,19 @@
         android:layout_height="50dp"
         android:layout_alignParentEnd="true"
         android:layout_alignParentTop="true"
-        android:layout_margin="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginTop="10dp"
         android:contentDescription="show wifi status"
-        android:src="@drawable/shape_circle_button" />
+        android:src="@drawable/wifi_x" />
 
     <TextView
-
         android:id="@+id/tv_wifi"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignBaseline="@id/iv_wifi"
+        android:layout_alignEnd="@id/iv_wifi"
         android:layout_below="@id/iv_wifi"
-        tools:text="wzkj" />
+        android:gravity="center"
+        android:lines="1"
+        android:textSize="22sp"
+        tools:text="wzk1" />
 </RelativeLayout>
