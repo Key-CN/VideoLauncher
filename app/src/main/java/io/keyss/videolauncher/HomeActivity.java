@@ -77,7 +77,7 @@ public class HomeActivity extends Activity {
         tv_wifi = findViewById(R.id.tv_wifi);
         iv_wifi = findViewById(R.id.iv_wifi);
         start.setOnClickListener(v -> {
-            if (mLastDelay < WifiStatus.WIFI_2.value) {
+            if (mLastDelay > WifiStatus.WIFI_2.value) {
                 Toast.makeText(HomeActivity.this, "当前网络质量不佳，暂时无法启动", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -139,7 +139,9 @@ public class HomeActivity extends Activity {
 
     private void checkNetwork() {
         try {
-            changeWifiSSID();
+            if (isActivityVisible) {
+                changeWifiSSID();
+            }
             Process process = Runtime.getRuntime().exec("ping -c 1 test.futurearriving.com");
             BufferedReader bf = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
