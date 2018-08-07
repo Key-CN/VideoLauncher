@@ -11,7 +11,13 @@ import android.util.Log;
  * @author Key
  * Time: 2018/8/4 14:03
  * Description:
+ * <receiver android:name=".WifiBroadcastReceiver">
+ * <intent-filter>
+ * <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+ * </intent-filter>
+ * </receiver>
  */
+@Deprecated
 public class WifiBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {

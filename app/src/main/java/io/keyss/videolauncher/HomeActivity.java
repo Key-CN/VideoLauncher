@@ -11,17 +11,17 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.util.Log;
+import android.provider.Settings;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.util.Arrays;
 import java.util.Calendar;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import io.keyss.videolauncher.utils.KeyDoubleClickCheckUtil;
 import io.keyss.videolauncher.utils.ScreenTool;
 
 /**
@@ -31,37 +31,36 @@ public class HomeActivity extends Activity {
 
     public static boolean isWifiConnected;
 
-    private static final String mCheckStartString = "time=";
-    private static final String mCheckEndString = " ms";
     private static final int START_TIME = 8;
     private static final int END_TIME = 18;
 
     private Button start;
     private ImageView iv_wifi;
     private TextView tv_wifi;
+    private TextView tv_wifi_rssi;
+    private TextView tv_wifi_speed;
+    private TextView tv_wifi_state;
 
-    private Double mLastDelay = WifiStatus.WIFI_X.value;
-    private Double[] mDelays = new Double[10];
-    private int mDelaysIndex = 0;
+
     private boolean isMainStart;
     private boolean isActivityVisible;
     private Calendar calendar;
+    private ExecutorService executorService;
+    private WifiInfo wifiInfo;
 
-
-    enum WifiStatus {
-        WIFI_X(2000), WIFI_1(1500), WIFI_2(1000), WIFI_3(500);
-
-        double value;
-
-        WifiStatus(double value) {
-            this.value = value;
-        }
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initView();
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (wifiManager != null) {
+            if (!wifiManager.isWifiEnabled()) {
+                wifiManager.setWifiEnabled(true);
+            }
+            wifiInfo = wifiManager.getConnectionInfo();
+        }
+        executorService = Executors.newCachedThreadPool();
 
         Looper.myQueue().addIdleHandler(() -> {
             onActivityInitialized();
@@ -71,17 +70,30 @@ public class HomeActivity extends Activity {
 
     private void initView() {
         setContentView(R.layout.activity_home);
-        //ScreenTool.hideNavbar(this);
-        ScreenTool.showNavbar(this);
+        ScreenTool.hideNavbar(this);
+        //ScreenTool.showNavbar(this);
         start = findViewById(R.id.b_start);
         tv_wifi = findViewById(R.id.tv_wifi);
+        tv_wifi_rssi = findViewById(R.id.tv_wifi_rssi);
+        tv_wifi_speed = findViewById(R.id.tv_wifi_speed);
+        tv_wifi_state = findViewById(R.id.tv_wifi_state);
         iv_wifi = findViewById(R.id.iv_wifi);
+        iv_wifi.setOnClickListener(v -> startActivityForResult(new Intent(Settings.ACTION_WIFI_SETTINGS)
+                .putExtra("wifi_enable_next_on_connect", true) //是否打开网络连接检测功能（如果连上wifi，则下一步按钮可被点击）
+                .putExtra("extra_prefs_show_button_bar", true)
+                .putExtra("extra_prefs_set_next_text", "完成")
+                .putExtra("extra_prefs_set_back_text", "取消"), 2223));
         start.setOnClickListener(v -> {
-            if (mLastDelay > WifiStatus.WIFI_2.value) {
-                Toast.makeText(HomeActivity.this, "当前网络质量不佳，暂时无法启动", Toast.LENGTH_SHORT).show();
-                return;
+            if (KeyDoubleClickCheckUtil.checkFastDouble(2000)) {
+                Toast.makeText(this, "正在启动", Toast.LENGTH_SHORT).show();
+            } else {
+                startMainApp();
             }
-            startMainApp();
+        });
+        findViewById(R.id.v_hidden_function).setOnClickListener(v -> {
+            Intent intent = new Intent();
+            intent.setAction("ACTION_RK_REBOOT");
+            sendBroadcast(intent, null);
         });
     }
 
@@ -97,8 +109,16 @@ public class HomeActivity extends Activity {
     }
 
     private void onActivityInitialized() {
-        // TODO 开启一个定时任务，而不是无限循环，迟早要断
-        new Thread(this::checkNetwork).start();
+
+    }
+
+    private void updateWifiInfo() {
+        if (wifiInfo != null) {
+            tv_wifi_speed.setText(wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS);
+            tv_wifi.setText(wifiInfo.getSSID());
+            tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
+            tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
+        }
     }
 
     private boolean isInSchoolTime() {
@@ -107,112 +127,6 @@ public class HomeActivity extends Activity {
         }
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         return hour >= START_TIME && hour < END_TIME;
-    }
-
-    private void changeWifiSSID() {
-        WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wifi != null) {
-            wifi.setWifiEnabled(true);
-            WifiInfo connectionInfo = wifi.getConnectionInfo();
-            connectionInfo.getSupplicantState();
-            tv_wifi.post(() -> tv_wifi.setText(connectionInfo.getSSID()));
-        }
-    }
-
-    private int getWifiStatus() {
-        if (!isWifiConnected) {
-            return WifiStatus.WIFI_X.ordinal();
-        }
-        double ping = 0;
-        int count = 0;
-        for (Double delay : mDelays) {
-            if (delay != null) {
-                ping += delay;
-                count++;
-            }
-        }
-        return ping / count < WifiStatus.WIFI_3.value ?
-                WifiStatus.WIFI_3.ordinal() : ping < WifiStatus.WIFI_2.value ?
-                WifiStatus.WIFI_2.ordinal() : ping < WifiStatus.WIFI_1.value ?
-                WifiStatus.WIFI_1.ordinal() : WifiStatus.WIFI_X.ordinal();
-    }
-
-    private void checkNetwork() {
-        try {
-            if (isActivityVisible) {
-                changeWifiSSID();
-            }
-            Process process = Runtime.getRuntime().exec("ping -c 1 test.futurearriving.com");
-            BufferedReader bf = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            int startIndex;
-            while ((line = bf.readLine()) != null) {
-                //Log.e("Key", line);
-                startIndex = line.lastIndexOf(mCheckStartString);
-                if (startIndex > 0) {
-                    mLastDelay = Double.valueOf(line.substring(startIndex + mCheckStartString.length(), line.lastIndexOf(mCheckEndString)));
-                    if (isWifiConnected = mLastDelay < WifiStatus.WIFI_3.value) {
-                        if (isActivityVisible) {
-                            // 三条杠WIFI
-                            iv_wifi.post(() -> iv_wifi.setImageResource(R.drawable.wifi_3));
-                        }
-                        if (isInSchoolTime() && !isMainStart) {
-                            startMainApp();
-                            sendWifiStatusBroadcast(getWifiStatus());
-                        }
-                    } else if (mLastDelay < WifiStatus.WIFI_2.value) {
-                        if (isActivityVisible) {
-                            // 2条杠WIFI
-                            iv_wifi.post(() -> iv_wifi.setImageResource(R.drawable.wifi_2));
-                        }
-                    } else if (mLastDelay < WifiStatus.WIFI_1.value) {
-                        if (isActivityVisible) {
-                            // 1条杠WIFI
-                            iv_wifi.post(() -> iv_wifi.setImageResource(R.drawable.wifi_1));
-                        }
-                    } else {
-                        if (isActivityVisible) {
-                            // 叉叉WIFI
-                            iv_wifi.post(() -> iv_wifi.setImageResource(R.drawable.wifi_x));
-                        }
-                    }
-                    mDelays[mDelaysIndex++] = mLastDelay;
-                    if (mDelaysIndex > 9) {
-                        mDelaysIndex = 0;
-                        sendWifiStatusBroadcast(getWifiStatus());
-
-                    }
-                    Log.i("Key", "延时: " + mLastDelay + "  arrays: " + Arrays.toString(mDelays));
-                }
-            }
-            int waitFor = process.waitFor();
-            Log.e("Key", "waitFor: " + waitFor);
-            if (waitFor == 0) {
-                // 0就直接重启
-                SystemClock.sleep(3000);
-                // StackOverflowError
-                checkNetwork();
-            } else {
-                // 1，需要网页认证的wifi 2，当前网络不可用， 递归检测
-                isWifiConnected = false;
-                if (isActivityVisible) {
-                    // 叉叉WIFI
-                    iv_wifi.post(() -> iv_wifi.setImageResource(R.drawable.wifi_x));
-                }
-                SystemClock.sleep(3000);
-                checkNetwork();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void sendWifiStatusBroadcast(int status) {
-        Intent intent = new Intent();
-        intent.setAction("io.keyss.action.WifiStatus");
-        intent.putExtra("status", status);
-        //发送广播
-        sendBroadcast(intent);
     }
 
     public void controlAlarm(long startTime, long matchId, Intent nextIntent) {
@@ -234,12 +148,24 @@ public class HomeActivity extends Activity {
     protected void onStart() {
         super.onStart();
         isActivityVisible = true;
+        // TODO 开启检测
+        if (isInSchoolTime()) {
+            executorService.execute(() -> {
+                while (isActivityVisible) {
+                    runOnUiThread(this::updateWifiInfo);
+                    SystemClock.sleep(3000);
+                }
+            });
+        } else {
+            tv_wifi.setText("非上学时间暂停检测");
+        }
     }
 
     @Override
     protected void onStop() {
         super.onStop();
         isActivityVisible = false;
+        // TODO 关闭检测
     }
 
     @Override
