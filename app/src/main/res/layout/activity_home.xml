@@ -27,7 +27,7 @@
         android:layout_marginEnd="20dp"
         android:layout_marginTop="10dp"
         android:contentDescription="show wifi status"
-        android:src="@drawable/wifi_x" />
+        android:src="@drawable/wifi_3" />
 
     <TextView
         android:id="@+id/tv_wifi"
@@ -76,11 +76,11 @@
 
     <View
         android:id="@+id/v_hidden_function"
-        android:layout_marginStart="20dp"
-        android:layout_marginBottom="90dp"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentBottom="true"
         android:layout_width="80dp"
-        android:layout_height="80dp"/>
+        android:layout_height="80dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true"
+        android:layout_marginBottom="90dp"
+        android:layout_marginStart="20dp" />
 
 </RelativeLayout>
