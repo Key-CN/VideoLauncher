@@ -6,12 +6,14 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -46,19 +48,18 @@ public class HomeActivity extends Activity {
     private boolean isActivityVisible;
     private Calendar calendar;
     private ExecutorService executorService;
-    private WifiInfo wifiInfo;
+    private WifiManager wifiManager;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initView();
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if (wifiManager != null) {
             if (!wifiManager.isWifiEnabled()) {
                 wifiManager.setWifiEnabled(true);
             }
-            wifiInfo = wifiManager.getConnectionInfo();
         }
         executorService = Executors.newCachedThreadPool();
 
@@ -70,8 +71,8 @@ public class HomeActivity extends Activity {
 
     private void initView() {
         setContentView(R.layout.activity_home);
-        ScreenTool.hideNavbar(this);
-        //ScreenTool.showNavbar(this);
+        //ScreenTool.hideNavbar(this);
+        ScreenTool.showNavbar(this);
         start = findViewById(R.id.b_start);
         tv_wifi = findViewById(R.id.tv_wifi);
         tv_wifi_rssi = findViewById(R.id.tv_wifi_rssi);
@@ -90,7 +91,7 @@ public class HomeActivity extends Activity {
                 startMainApp();
             }
         });
-        findViewById(R.id.v_hidden_function).setOnClickListener(v -> {
+        findViewById(R.id.hidden_function).setOnClickListener(v -> {
             Intent intent = new Intent();
             intent.setAction("ACTION_RK_REBOOT");
             sendBroadcast(intent, null);
@@ -113,11 +114,15 @@ public class HomeActivity extends Activity {
     }
 
     private void updateWifiInfo() {
-        if (wifiInfo != null) {
-            tv_wifi_speed.setText(wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS);
-            tv_wifi.setText(wifiInfo.getSSID());
-            tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
-            tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
+        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+        Log.e("Key123", "wifiInfo: " + wifiInfo.getSupplicantState());
+        tv_wifi_speed.setText(wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS);
+        tv_wifi.setText(wifiInfo.getSSID());
+        tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
+        tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
+        // COMPLETED
+        if (wifiInfo.getSupplicantState() == SupplicantState.COMPLETED) {
+            // 检测后台程序，然后打开APP
         }
     }
 
@@ -145,15 +150,15 @@ public class HomeActivity extends Activity {
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onResume() {
+        super.onResume();
         isActivityVisible = true;
         // TODO 开启检测
         if (isInSchoolTime()) {
             executorService.execute(() -> {
                 while (isActivityVisible) {
                     runOnUiThread(this::updateWifiInfo);
-                    SystemClock.sleep(3000);
+                    SystemClock.sleep(5000);
                 }
             });
         } else {
@@ -162,8 +167,8 @@ public class HomeActivity extends Activity {
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
+    protected void onPause() {
+        super.onPause();
         isActivityVisible = false;
         // TODO 关闭检测
     }
