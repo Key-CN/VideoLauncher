@@ -117,8 +117,8 @@ public class HomeActivity extends Activity {
             } catch (Exception e) {
                 // ActivityNotFoundException
                 e.printStackTrace();
+                Log.e("Keyss.io", "error: " + e.getLocalizedMessage());
             }
-            SystemClock.sleep(1000);
             isMainStart = false;
         }
     }
