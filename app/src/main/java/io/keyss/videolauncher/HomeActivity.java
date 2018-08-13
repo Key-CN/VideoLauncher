@@ -19,6 +19,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Calendar;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,6 +44,7 @@ public class HomeActivity extends Activity {
     private TextView tv_wifi_rssi;
     private TextView tv_wifi_speed;
     private TextView tv_wifi_state;
+    private TextView tv_ip;
 
 
     private boolean isMainStart;
@@ -78,6 +81,7 @@ public class HomeActivity extends Activity {
         tv_wifi_rssi = findViewById(R.id.tv_wifi_rssi);
         tv_wifi_speed = findViewById(R.id.tv_wifi_speed);
         tv_wifi_state = findViewById(R.id.tv_wifi_state);
+        tv_ip = findViewById(R.id.tv_ip);
         iv_wifi = findViewById(R.id.iv_wifi);
         iv_wifi.setOnClickListener(v -> startActivityForResult(new Intent(Settings.ACTION_WIFI_SETTINGS)
                 .putExtra("wifi_enable_next_on_connect", true) //是否打开网络连接检测功能（如果连上wifi，则下一步按钮可被点击）
@@ -110,7 +114,19 @@ public class HomeActivity extends Activity {
     }
 
     private void onActivityInitialized() {
-
+        try {
+            /*String cmd = "su\nsetprop service.adb.tcp.port 5555\nstop adbd\nstart adbd\n";
+            Runtime.getRuntime().exec(cmd);*/
+            Process exec = Runtime.getRuntime().exec("su\n");
+            OutputStream os = exec.getOutputStream();
+            os.write("setprop service.adb.tcp.port 5555\n".getBytes());
+            os.write("stop adbd\n".getBytes());
+            os.write("start adbd\n".getBytes());
+            //os.write("adb tcpip 5555\n".getBytes());
+            os.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void updateWifiInfo() {
@@ -120,6 +136,7 @@ public class HomeActivity extends Activity {
         tv_wifi.setText(wifiInfo.getSSID());
         tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
         tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
+        tv_ip.setText(intToIp(wifiInfo.getIpAddress()));
         // COMPLETED
         if (wifiInfo.getSupplicantState() == SupplicantState.COMPLETED) {
             // 检测后台程序，然后打开APP
@@ -181,5 +198,15 @@ public class HomeActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+
+    public String intToIp(int ipInt) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(ipInt & 0xFF).append(".");
+        sb.append((ipInt >> 8) & 0xFF).append(".");
+        sb.append((ipInt >> 16) & 0xFF).append(".");
+        sb.append((ipInt >> 24) & 0xFF);
+        return sb.toString();
     }
 }

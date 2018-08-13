@@ -74,6 +74,17 @@
         android:textSize="22sp"
         tools:text="state" />
 
+    <TextView
+        android:id="@+id/tv_ip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignEnd="@id/tv_wifi"
+        android:layout_below="@id/tv_wifi_state"
+        android:gravity="center"
+        android:lines="1"
+        android:textSize="22sp"
+        tools:text="ip" />
+
     <Button
         android:id="@+id/hidden_function"
         android:layout_width="80dp"
