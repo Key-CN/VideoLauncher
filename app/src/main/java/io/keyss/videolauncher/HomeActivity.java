@@ -1,6 +1,7 @@
 package io.keyss.videolauncher;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -33,8 +34,7 @@ import io.keyss.videolauncher.utils.ScreenTool;
  */
 public class HomeActivity extends Activity {
 
-    public static boolean isWifiConnected;
-
+    private String mAppPackageName = "io.keyss.microbeanandroid";
     private static final int START_TIME = 8;
     private static final int END_TIME = 18;
 
@@ -45,7 +45,6 @@ public class HomeActivity extends Activity {
     private TextView tv_wifi_speed;
     private TextView tv_wifi_state;
     private TextView tv_ip;
-
 
     private boolean isMainStart;
     private boolean isActivityVisible;
@@ -64,7 +63,7 @@ public class HomeActivity extends Activity {
                 wifiManager.setWifiEnabled(true);
             }
         }
-        executorService = Executors.newCachedThreadPool();
+        executorService = Executors.newSingleThreadExecutor();
 
         Looper.myQueue().addIdleHandler(() -> {
             onActivityInitialized();
@@ -74,8 +73,8 @@ public class HomeActivity extends Activity {
 
     private void initView() {
         setContentView(R.layout.activity_home);
-        //ScreenTool.hideNavbar(this);
-        ScreenTool.showNavbar(this);
+        ScreenTool.hideNavbar(this);
+        //ScreenTool.showNavbar(this);
         start = findViewById(R.id.b_start);
         tv_wifi = findViewById(R.id.tv_wifi);
         tv_wifi_rssi = findViewById(R.id.tv_wifi_rssi);
@@ -89,7 +88,7 @@ public class HomeActivity extends Activity {
                 .putExtra("extra_prefs_set_next_text", "完成")
                 .putExtra("extra_prefs_set_back_text", "取消"), 2223));
         start.setOnClickListener(v -> {
-            if (KeyDoubleClickCheckUtil.checkFastDouble(2000)) {
+            if (isMainStart || KeyDoubleClickCheckUtil.checkFastDouble(2000)) {
                 Toast.makeText(this, "正在启动", Toast.LENGTH_SHORT).show();
             } else {
                 startMainApp();
@@ -103,21 +102,34 @@ public class HomeActivity extends Activity {
     }
 
     private void startMainApp() {
-        Intent init = new Intent(Intent.ACTION_VIEW, Uri.parse("video://init"));
-        try {
-            startActivity(init);
+        if (!isMainStart) {
             isMainStart = true;
-        } catch (Exception e) {
-            e.printStackTrace();
+            executorService.shutdownNow();
+            Intent init = new Intent(Intent.ACTION_VIEW, Uri.parse("video://init"));
+            try {
+                Log.e("Keyss.io", "启动APP: " + init);
+                startActivity(init);
+            } catch (Exception e) {
+                // ActivityNotFoundException
+                e.printStackTrace();
+            }
+            SystemClock.sleep(1000);
             isMainStart = false;
         }
     }
 
     private void onActivityInitialized() {
+        openWifiAdb();
+    }
+
+    /**
+     * 打开wifi调试，正式环境中删除，外勤调试使用
+     */
+    private void openWifiAdb() {
         try {
             /*String cmd = "su\nsetprop service.adb.tcp.port 5555\nstop adbd\nstart adbd\n";
             Runtime.getRuntime().exec(cmd);*/
-            Process exec = Runtime.getRuntime().exec("su\n");
+            Process exec = Runtime.getRuntime().exec("su");
             OutputStream os = exec.getOutputStream();
             os.write("setprop service.adb.tcp.port 5555\n".getBytes());
             os.write("stop adbd\n".getBytes());
@@ -140,6 +152,7 @@ public class HomeActivity extends Activity {
         // COMPLETED
         if (wifiInfo.getSupplicantState() == SupplicantState.COMPLETED) {
             // 检测后台程序，然后打开APP
+            searchApp();
         }
     }
 
@@ -149,6 +162,27 @@ public class HomeActivity extends Activity {
         }
         int hour = calendar.get(Calendar.HOUR_OF_DAY);
         return hour >= START_TIME && hour < END_TIME;
+    }
+
+    public void searchApp() {
+        ActivityManager am = ((ActivityManager) getSystemService(Context.ACTIVITY_SERVICE));
+        if (null != am) {
+            /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
+            for (ActivityManager.RunningAppProcessInfo info : processInfos) {
+                if (mAppPackageName.equals(info.processName)) {
+                    // TODO 杀掉后启动
+                    Log.e("Key123", "杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
+                    am.killBackgroundProcesses(info.processName);
+                    SystemClock.sleep(1000);
+                    break;
+                }
+            }*/
+            am.killBackgroundProcesses(mAppPackageName);
+            SystemClock.sleep(1000);
+            startMainApp();
+        } else {
+            startMainApp();
+        }
     }
 
     public void controlAlarm(long startTime, long matchId, Intent nextIntent) {
@@ -169,13 +203,14 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        isActivityVisible = true;
         // TODO 开启检测
+        isActivityVisible = true;
         if (isInSchoolTime()) {
             executorService.execute(() -> {
                 while (isActivityVisible) {
+                    SystemClock.sleep(3000);
                     runOnUiThread(this::updateWifiInfo);
-                    SystemClock.sleep(5000);
+                    SystemClock.sleep(3000);
                 }
             });
         } else {
@@ -186,8 +221,8 @@ public class HomeActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        isActivityVisible = false;
         // TODO 关闭检测
+        isActivityVisible = false;
     }
 
     @Override
