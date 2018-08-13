@@ -96,10 +96,11 @@
         android:background="@null" />
 
     <ImageView
-        android:layout_width="2dp"
-        android:layout_height="2dp"
+        android:layout_width="80dp"
+        android:layout_height="8dp"
         android:layout_above="@id/hidden_function"
         android:layout_alignStart="@id/hidden_function"
-        android:background="@android:color/holo_blue_bright" />
+        android:background="@android:color/holo_blue_bright"
+        android:visibility="gone" />
 
 </RelativeLayout>

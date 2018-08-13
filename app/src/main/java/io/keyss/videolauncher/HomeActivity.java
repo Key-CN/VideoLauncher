@@ -94,10 +94,15 @@ public class HomeActivity extends Activity {
                 startMainApp();
             }
         });
-        findViewById(R.id.hidden_function).setOnClickListener(v -> {
+        start.setOnLongClickListener(v -> {
+            ScreenTool.showNavbar(HomeActivity.this);
+            return true;
+        });
+        findViewById(R.id.hidden_function).setOnLongClickListener(v -> {
             Intent intent = new Intent();
             intent.setAction("ACTION_RK_REBOOT");
             sendBroadcast(intent, null);
+            return true;
         });
     }
 
