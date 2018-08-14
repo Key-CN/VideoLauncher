@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -45,13 +46,15 @@ public class HomeActivity extends Activity {
     private TextView tv_wifi_speed;
     private TextView tv_wifi_state;
     private TextView tv_ip;
+    private ProgressDialog dialog;
+
 
     private boolean isMainStart;
     private boolean isActivityVisible;
     private Calendar calendar;
     private ExecutorService executorService;
     private WifiManager wifiManager;
-
+    private boolean isFirstStart = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +67,7 @@ public class HomeActivity extends Activity {
             }
         }
         executorService = Executors.newSingleThreadExecutor();
+        dialog = new ProgressDialog(this);
 
         Looper.myQueue().addIdleHandler(() -> {
             onActivityInitialized();
@@ -212,11 +216,22 @@ public class HomeActivity extends Activity {
         isActivityVisible = true;
         if (isInSchoolTime()) {
             executorService.execute(() -> {
-                while (isActivityVisible) {
-                    SystemClock.sleep(3000);
-                    runOnUiThread(this::updateWifiInfo);
-                    SystemClock.sleep(3000);
+                if (isFirstStart) {
+                    isFirstStart = false;
+                    runOnUiThread(() -> {
+                        dialog.setMessage("正在启动中...");
+                        dialog.setCancelable(false);
+                        dialog.show();
+                    });
+                    SystemClock.sleep(10000);
+                    runOnUiThread(dialog::dismiss);
                 }
+                while (isActivityVisible) {
+                    SystemClock.sleep(1000);
+                    runOnUiThread(this::updateWifiInfo);
+                    SystemClock.sleep(5000);
+                }
+
             });
         } else {
             tv_wifi.setText("非上学时间暂停检测");
