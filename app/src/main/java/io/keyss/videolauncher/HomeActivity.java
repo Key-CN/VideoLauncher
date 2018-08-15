@@ -51,6 +51,7 @@ public class HomeActivity extends Activity {
 
     private boolean isMainStart;
     private boolean isActivityVisible;
+    private boolean isSearching;
     private Calendar calendar;
     private ExecutorService executorService;
     private WifiManager wifiManager;
@@ -113,7 +114,8 @@ public class HomeActivity extends Activity {
     private void startMainApp() {
         if (!isMainStart) {
             isMainStart = true;
-            executorService.shutdownNow();
+            // [Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 1]
+            //executorService.shutdownNow();
             Intent init = new Intent(Intent.ACTION_VIEW, Uri.parse("video://init"));
             try {
                 Log.e("Keyss.io", "启动APP: " + init);
@@ -187,7 +189,6 @@ public class HomeActivity extends Activity {
                 }
             }*/
             am.killBackgroundProcesses(mAppPackageName);
-            SystemClock.sleep(1000);
             startMainApp();
         } else {
             startMainApp();
@@ -214,7 +215,8 @@ public class HomeActivity extends Activity {
         super.onResume();
         // TODO 开启检测
         isActivityVisible = true;
-        if (isInSchoolTime()) {
+        if (isInSchoolTime() && !isSearching) {
+            isSearching = true;
             executorService.execute(() -> {
                 if (isFirstStart) {
                     isFirstStart = false;
@@ -231,7 +233,7 @@ public class HomeActivity extends Activity {
                     runOnUiThread(this::updateWifiInfo);
                     SystemClock.sleep(5000);
                 }
-
+                isSearching = false;
             });
         } else {
             tv_wifi.setText("非上学时间暂停检测");
