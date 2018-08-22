@@ -36,8 +36,8 @@ import io.keyss.videolauncher.utils.ScreenTool;
 public class HomeActivity extends Activity {
 
     private String mAppPackageName = "io.keyss.microbeanandroid";
-    private static final int START_TIME = 8;
-    private static final int END_TIME = 18;
+    private static final int START_TIME = 0;
+    private static final int END_TIME = 24;
 
     private Button start;
     private ImageView iv_wifi;
@@ -60,6 +60,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.e(getLocalClassName(), "HomeActivity onCreate 开始初始化");
         initView();
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         if (wifiManager != null) {
@@ -130,7 +131,7 @@ public class HomeActivity extends Activity {
     }
 
     private void onActivityInitialized() {
-        openWifiAdb();
+
     }
 
     /**
@@ -146,6 +147,16 @@ public class HomeActivity extends Activity {
             os.write("stop adbd\n".getBytes());
             os.write("start adbd\n".getBytes());
             //os.write("adb tcpip 5555\n".getBytes());
+
+            os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
+            os.write("busybox route add default gw 192.168.0.1\n".getBytes());
+            os.write("iptables --flush\n".getBytes());
+            os.write("iptables --table nat --flush\n".getBytes());
+            os.write("iptables --delete-chain\n".getBytes());
+            os.write("iptables --table nat --delete-chain\n".getBytes());
+            os.write("iptables --table nat --append POSTROUTING --out-interface wlan0 -j MASQUERADE\n".getBytes());
+            os.write("iptables --append FORWARD --in-interface eth0 -j ACCEPT\n".getBytes());
+
             os.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -163,7 +174,8 @@ public class HomeActivity extends Activity {
         // COMPLETED
         if (wifiInfo.getSupplicantState() == SupplicantState.COMPLETED) {
             // 检测后台程序，然后打开APP
-            searchApp();
+            //searchApp();
+            Toast.makeText(this, "WIFI连接完成，debug版手动启动", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -181,7 +193,7 @@ public class HomeActivity extends Activity {
             /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
             for (ActivityManager.RunningAppProcessInfo info : processInfos) {
                 if (mAppPackageName.equals(info.processName)) {
-                    // TODO 杀掉后启动
+                    // 杀掉后启动
                     Log.e("Key123", "杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
                     am.killBackgroundProcesses(info.processName);
                     SystemClock.sleep(1000);
@@ -213,7 +225,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        // TODO 开启检测
+        // 开启检测
         isActivityVisible = true;
         if (isInSchoolTime() && !isSearching) {
             isSearching = true;
@@ -225,7 +237,8 @@ public class HomeActivity extends Activity {
                         dialog.setCancelable(false);
                         dialog.show();
                     });
-                    SystemClock.sleep(10000);
+                    SystemClock.sleep(12000);
+                    openWifiAdb();
                     runOnUiThread(dialog::dismiss);
                 }
                 while (isActivityVisible) {
@@ -243,7 +256,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        // TODO 关闭检测
+        // 关闭检测
         isActivityVisible = false;
     }
 
