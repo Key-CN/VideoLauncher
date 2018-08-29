@@ -68,8 +68,10 @@ public class HomeActivity extends Activity {
                 wifiManager.setWifiEnabled(true);
             }
         }
-        executorService = Executors.newSingleThreadExecutor();
+        executorService = Executors.newCachedThreadPool();
+
         dialog = new ProgressDialog(this);
+        dialog.setCancelable(false);
 
         Looper.myQueue().addIdleHandler(() -> {
             onActivityInitialized();
@@ -148,14 +150,14 @@ public class HomeActivity extends Activity {
             os.write("start adbd\n".getBytes());
             //os.write("adb tcpip 5555\n".getBytes());
 
-            os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
-            os.write("busybox route add default gw 192.168.0.1\n".getBytes());
             os.write("iptables --flush\n".getBytes());
             os.write("iptables --table nat --flush\n".getBytes());
             os.write("iptables --delete-chain\n".getBytes());
             os.write("iptables --table nat --delete-chain\n".getBytes());
             os.write("iptables --table nat --append POSTROUTING --out-interface wlan0 -j MASQUERADE\n".getBytes());
             os.write("iptables --append FORWARD --in-interface eth0 -j ACCEPT\n".getBytes());
+            os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
+            os.write("busybox route add default gw 192.168.0.1\n".getBytes());
 
             os.close();
         } catch (IOException e) {
@@ -173,6 +175,18 @@ public class HomeActivity extends Activity {
         tv_ip.setText(intToIp(wifiInfo.getIpAddress()));
         // COMPLETED
         if (wifiInfo.getSupplicantState() == SupplicantState.COMPLETED) {
+            if (isFirstStart) {
+                isFirstStart = false;
+                dialog.setMessage("正在配置网络...");
+                dialog.show();
+                executorService.execute(() -> {
+                    Log.e("Key123", "网络配置");
+                    SystemClock.sleep(3000);
+                    openWifiAdb();
+                    SystemClock.sleep(2000);
+                    runOnUiThread(dialog::dismiss);
+                });
+            }
             // 检测后台程序，然后打开APP
             //searchApp();
             Toast.makeText(this, "WIFI连接完成，debug版手动启动", Toast.LENGTH_SHORT).show();
@@ -231,14 +245,11 @@ public class HomeActivity extends Activity {
             isSearching = true;
             executorService.execute(() -> {
                 if (isFirstStart) {
-                    isFirstStart = false;
                     runOnUiThread(() -> {
                         dialog.setMessage("正在启动中...");
-                        dialog.setCancelable(false);
                         dialog.show();
                     });
-                    SystemClock.sleep(12000);
-                    openWifiAdb();
+                    SystemClock.sleep(10000);
                     runOnUiThread(dialog::dismiss);
                 }
                 while (isActivityVisible) {
