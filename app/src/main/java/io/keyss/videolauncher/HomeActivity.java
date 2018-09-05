@@ -157,7 +157,10 @@ public class HomeActivity extends Activity {
             os.write("iptables --table nat --append POSTROUTING --out-interface wlan0 -j MASQUERADE\n".getBytes());
             os.write("iptables --append FORWARD --in-interface eth0 -j ACCEPT\n".getBytes());
             os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
-            os.write("busybox route add default gw 192.168.0.1\n".getBytes());
+
+            String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
+            Log.e("gateway", gateway);
+            os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
             os.close();
         } catch (IOException e) {
