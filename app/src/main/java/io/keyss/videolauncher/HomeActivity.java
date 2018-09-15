@@ -36,8 +36,8 @@ import io.keyss.videolauncher.utils.ScreenTool;
 public class HomeActivity extends Activity {
 
     private String mAppPackageName = "io.keyss.microbeanandroid";
-    private static final int START_TIME = 0;
-    private static final int END_TIME = 24;
+    private static final int START_TIME = 8;
+    private static final int END_TIME = 18;
 
     private Button start;
     private ImageView iv_wifi;
@@ -56,6 +56,7 @@ public class HomeActivity extends Activity {
     private ExecutorService executorService;
     private WifiManager wifiManager;
     private boolean isFirstStart = true;
+    private boolean mFinishBridge;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -144,6 +145,7 @@ public class HomeActivity extends Activity {
             /*String cmd = "su\nsetprop service.adb.tcp.port 5555\nstop adbd\nstart adbd\n";
             Runtime.getRuntime().exec(cmd);*/
             Process exec = Runtime.getRuntime().exec("su");
+            // su root 环境继续输入
             OutputStream os = exec.getOutputStream();
             os.write("setprop service.adb.tcp.port 5555\n".getBytes());
             os.write("stop adbd\n".getBytes());
@@ -163,8 +165,11 @@ public class HomeActivity extends Activity {
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
             os.close();
+
+            mFinishBridge = true;
         } catch (IOException e) {
             e.printStackTrace();
+            mFinishBridge = false;
         }
     }
 
@@ -184,15 +189,18 @@ public class HomeActivity extends Activity {
                 dialog.show();
                 executorService.execute(() -> {
                     Log.e("Key123", "网络配置");
-                    SystemClock.sleep(3000);
+                    SystemClock.sleep(1000);
                     openWifiAdb();
-                    SystemClock.sleep(2000);
+                    SystemClock.sleep(3000);
                     runOnUiThread(dialog::dismiss);
                 });
             }
             // 检测后台程序，然后打开APP
-            //searchApp();
-            Toast.makeText(this, "WIFI连接完成，debug版手动启动", Toast.LENGTH_SHORT).show();
+            if (BuildConfig.DEBUG) {
+                Toast.makeText(this, "WIFI连接完成，debug版手动启动", Toast.LENGTH_SHORT).show();
+            } else {
+                searchApp();
+            }
         }
     }
 
@@ -205,22 +213,30 @@ public class HomeActivity extends Activity {
     }
 
     public void searchApp() {
-        ActivityManager am = ((ActivityManager) getSystemService(Context.ACTIVITY_SERVICE));
-        if (null != am) {
-            /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
-            for (ActivityManager.RunningAppProcessInfo info : processInfos) {
-                if (mAppPackageName.equals(info.processName)) {
-                    // 杀掉后启动
-                    Log.e("Key123", "杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
-                    am.killBackgroundProcesses(info.processName);
-                    SystemClock.sleep(1000);
-                    break;
+        if (isInSchoolTime()) {
+            if (mFinishBridge) {
+                ActivityManager am = ((ActivityManager) getSystemService(Context.ACTIVITY_SERVICE));
+                if (null != am) {
+                /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
+                for (ActivityManager.RunningAppProcessInfo info : processInfos) {
+                    if (mAppPackageName.equals(info.processName)) {
+                        // 杀掉后启动
+                        Log.e("Key123", "杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
+                        am.killBackgroundProcesses(info.processName);
+                        SystemClock.sleep(1000);
+                        break;
+                    }
+                }*/
+                    am.killBackgroundProcesses(mAppPackageName);
+                    startMainApp();
+                } else {
+                    startMainApp();
                 }
-            }*/
-            am.killBackgroundProcesses(mAppPackageName);
-            startMainApp();
+            } else {
+                Toast.makeText(this, "请等待网络配置完成后启动", Toast.LENGTH_SHORT).show();
+            }
         } else {
-            startMainApp();
+            Toast.makeText(this, "非上学时间暂停自动启动", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -244,7 +260,7 @@ public class HomeActivity extends Activity {
         super.onResume();
         // 开启检测
         isActivityVisible = true;
-        if (isInSchoolTime() && !isSearching) {
+        if (!isSearching) {
             isSearching = true;
             executorService.execute(() -> {
                 if (isFirstStart) {
@@ -252,18 +268,16 @@ public class HomeActivity extends Activity {
                         dialog.setMessage("正在启动中...");
                         dialog.show();
                     });
-                    SystemClock.sleep(10000);
+                    SystemClock.sleep(8000);
                     runOnUiThread(dialog::dismiss);
                 }
                 while (isActivityVisible) {
-                    SystemClock.sleep(1000);
+                    SystemClock.sleep(300);
                     runOnUiThread(this::updateWifiInfo);
                     SystemClock.sleep(5000);
                 }
                 isSearching = false;
             });
-        } else {
-            tv_wifi.setText("非上学时间暂停检测");
         }
     }
 
