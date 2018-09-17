@@ -5,10 +5,12 @@ import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.NetworkInfo;
 import android.net.Uri;
-import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -35,7 +37,8 @@ import io.keyss.videolauncher.utils.ScreenTool;
  */
 public class HomeActivity extends Activity {
 
-    private String mAppPackageName = "io.keyss.microbeanandroid";
+    private String TAG;
+    private static final String APP_PACKAGE_NAME = "io.keyss.microbeanandroid";
     private static final int START_TIME = 8;
     private static final int END_TIME = 18;
 
@@ -57,18 +60,16 @@ public class HomeActivity extends Activity {
     private WifiManager wifiManager;
     private boolean isFirstStart = true;
     private boolean mFinishBridge;
+    private BroadcastReceiver receiver;
+    private boolean isWifiAvailable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.e(getLocalClassName(), "HomeActivity onCreate 开始初始化");
+        TAG = getLocalClassName();
+        logE("HomeActivity onCreate 开始初始化");
         initView();
-        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        if (wifiManager != null) {
-            if (!wifiManager.isWifiEnabled()) {
-                wifiManager.setWifiEnabled(true);
-            }
-        }
+        initNetwork();
         executorService = Executors.newCachedThreadPool();
 
         dialog = new ProgressDialog(this);
@@ -95,10 +96,10 @@ public class HomeActivity extends Activity {
                 .putExtra("wifi_enable_next_on_connect", true) //是否打开网络连接检测功能（如果连上wifi，则下一步按钮可被点击）
                 .putExtra("extra_prefs_show_button_bar", true)
                 .putExtra("extra_prefs_set_next_text", "完成")
-                .putExtra("extra_prefs_set_back_text", "取消"), 2223));
+                .putExtra("extra_prefs_set_back_text", "取消"), 2333));
         start.setOnClickListener(v -> {
-            if (isMainStart || KeyDoubleClickCheckUtil.checkFastDouble(2000)) {
-                Toast.makeText(this, "正在启动", Toast.LENGTH_SHORT).show();
+            if (KeyDoubleClickCheckUtil.checkFastDouble(2000)) {
+                Toast.makeText(this, "正在启动中，请稍等", Toast.LENGTH_SHORT).show();
             } else {
                 startMainApp();
             }
@@ -115,26 +116,89 @@ public class HomeActivity extends Activity {
         });
     }
 
-    private void startMainApp() {
-        if (!isMainStart) {
-            isMainStart = true;
-            // [Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 1]
-            //executorService.shutdownNow();
-            Intent init = new Intent(Intent.ACTION_VIEW, Uri.parse("video://init"));
-            try {
-                Log.e("Keyss.io", "启动APP: " + init);
-                startActivity(init);
-            } catch (Exception e) {
-                // ActivityNotFoundException
-                e.printStackTrace();
-                Log.e("Keyss.io", "error: " + e.getLocalizedMessage());
+    /**
+     * 初始化两个网卡
+     * 172.28.128.28 网卡
+     * 172.28.128.128 IPC
+     */
+    private void initNetwork() {
+        // TODO 打开有线网络，并配置不常用IP段
+        // EthernetManager mEthManager = (EthernetManager) getApplicationContext().getSystemService(Context.ETHERNET_SERVICE);
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        /*if (wifiManager != null) {
+            if (!wifiManager.isWifiEnabled()) {
+                isWifiAvailable = wifiManager.setWifiEnabled(true);
+            } else {
+                isWifiAvailable = true;
             }
-            isMainStart = false;
-        }
+        } else {
+            isWifiAvailable = false;
+        }*/
+
+        // 1行顶9行示范
+        isWifiAvailable = wifiManager != null && (wifiManager.isWifiEnabled() || wifiManager.setWifiEnabled(true));
+
+        IntentFilter filter = new IntentFilter();
+        //设置意图过滤
+        filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+
+        receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(intent.getAction())) {
+                    NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                    if (null != info) {
+                        String wifiStateName = info.getDetailedState().name();
+                        logE("onReceive - Wifi State Name: " + wifiStateName);
+                        tv_wifi_state.setText(wifiStateName);
+                        /*NetworkInfo.DetailedState state = info.getDetailedState();
+                        if (state == NetworkInfo.DetailedState.CONNECTING) {
+                            //connectWifiListener.showState("连接中...");
+                        } else if (state == NetworkInfo.DetailedState.AUTHENTICATING) {
+                            //connectWifiListener.showState("正在验证身份信息...");
+                        } else if (state == NetworkInfo.DetailedState.OBTAINING_IPADDR) {
+                            //connectWifiListener.showState("正在获取IP地址...");
+                        } else if (state == NetworkInfo.DetailedState.FAILED) {
+                            //connectWifiListener.showState("连接失败，点击任意地方关闭");
+                        }*/
+
+                        if (NetworkInfo.State.CONNECTED == info.getState()) {
+                            addGateway();
+                        }
+                    }
+                }
+            }
+        };
+
+        registerReceiver(receiver, filter);
     }
 
     private void onActivityInitialized() {
 
+    }
+
+    private void startMainApp() {
+        if (isWifiAvailable) {
+            if (!isMainStart) {
+                isMainStart = true;
+                // [Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 1]
+                //executorService.shutdownNow();
+                Intent init = new Intent(Intent.ACTION_VIEW, Uri.parse("video://init"));
+                try {
+                    logE("启动APP: " + init);
+                    startActivity(init);
+                } catch (Exception e) {
+                    // ActivityNotFoundException
+                    e.printStackTrace();
+                    logE("error: " + e.getLocalizedMessage());
+                }
+                isMainStart = false;
+            } else {
+                Toast.makeText(this, "正在启动中，请稍等", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "WIFI可能已损坏，请联系客服", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /**
@@ -152,6 +216,7 @@ public class HomeActivity extends Activity {
             os.write("start adbd\n".getBytes());
             //os.write("adb tcpip 5555\n".getBytes());
 
+            // 一次启动生效整个生命周期
             os.write("iptables --flush\n".getBytes());
             os.write("iptables --table nat --flush\n".getBytes());
             os.write("iptables --delete-chain\n".getBytes());
@@ -160,47 +225,51 @@ public class HomeActivity extends Activity {
             os.write("iptables --append FORWARD --in-interface eth0 -j ACCEPT\n".getBytes());
             os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
 
+            // 每次切换网络都需要设置默认网关
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
-            Log.e("gateway", gateway);
+            logE(gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
             os.close();
 
             mFinishBridge = true;
+            logE("双网卡桥接成功");
         } catch (IOException e) {
             e.printStackTrace();
             mFinishBridge = false;
         }
     }
 
+    private void addGateway() {
+        try {
+            Process exec = Runtime.getRuntime().exec("su");
+            OutputStream os = exec.getOutputStream();
+            String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
+            os.write(("busybox route add default gw " + gateway + "\n").getBytes());
+            os.close();
+            logE(gateway + "  Thread: " + Thread.currentThread().getName());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void updateWifiInfo() {
-        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-        Log.e("Key123", "wifiInfo: " + wifiInfo.getSupplicantState());
-        tv_wifi_speed.setText(wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS);
-        tv_wifi.setText(wifiInfo.getSSID());
-        tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
-        tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
-        tv_ip.setText(intToIp(wifiInfo.getIpAddress()));
-        // COMPLETED
-        if (wifiInfo.getSupplicantState() == SupplicantState.COMPLETED) {
-            if (isFirstStart) {
-                isFirstStart = false;
-                dialog.setMessage("正在配置网络...");
-                dialog.show();
-                executorService.execute(() -> {
-                    Log.e("Key123", "网络配置");
-                    SystemClock.sleep(1000);
-                    openWifiAdb();
-                    SystemClock.sleep(3000);
-                    runOnUiThread(dialog::dismiss);
-                });
-            }
+        // 不一定是wifiInfo.getSupplicantState() == SupplicantState.COMPLETED，比如首次启动，还没有连接过WIFI，或者WIFI名字换了，搜索不到等
+        if (isWifiAvailable) {
+            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+            tv_wifi_speed.setText(wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS);
+            tv_wifi.setText(wifiInfo.getSSID());
+            tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
+            tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
+            tv_ip.setText(intToIp(wifiInfo.getIpAddress()));
             // 检测后台程序，然后打开APP
             if (BuildConfig.DEBUG) {
                 Toast.makeText(this, "WIFI连接完成，debug版手动启动", Toast.LENGTH_SHORT).show();
             } else {
                 searchApp();
             }
+        } else {
+            Toast.makeText(this, "WIFI可能已损坏，请联系客服", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -219,15 +288,15 @@ public class HomeActivity extends Activity {
                 if (null != am) {
                 /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
                 for (ActivityManager.RunningAppProcessInfo info : processInfos) {
-                    if (mAppPackageName.equals(info.processName)) {
+                    if (APP_PACKAGE_NAME.equals(info.processName)) {
                         // 杀掉后启动
-                        Log.e("Key123", "杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
+                        logE("杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
                         am.killBackgroundProcesses(info.processName);
                         SystemClock.sleep(1000);
                         break;
                     }
                 }*/
-                    am.killBackgroundProcesses(mAppPackageName);
+                    am.killBackgroundProcesses(APP_PACKAGE_NAME);
                     startMainApp();
                 } else {
                     startMainApp();
@@ -264,11 +333,17 @@ public class HomeActivity extends Activity {
             isSearching = true;
             executorService.execute(() -> {
                 if (isFirstStart) {
+                    isFirstStart = false;
                     runOnUiThread(() -> {
                         dialog.setMessage("正在启动中...");
                         dialog.show();
                     });
                     SystemClock.sleep(8000);
+                    runOnUiThread(() -> dialog.setMessage("正在配置网络..."));
+                    logE("网络配置");
+                    SystemClock.sleep(5000);
+                    openWifiAdb();
+                    SystemClock.sleep(2000);
                     runOnUiThread(dialog::dismiss);
                 }
                 while (isActivityVisible) {
@@ -296,6 +371,7 @@ public class HomeActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        unregisterReceiver(receiver);
     }
 
 
@@ -306,5 +382,9 @@ public class HomeActivity extends Activity {
         sb.append((ipInt >> 16) & 0xFF).append(".");
         sb.append((ipInt >> 24) & 0xFF);
         return sb.toString();
+    }
+
+    private void logE(String msg) {
+        Log.e(TAG, "Thread: " + Thread.currentThread().getName() + "  msg: " + msg);
     }
 }
