@@ -151,15 +151,29 @@ public class HomeActivity extends Activity {
                         String wifiStateName = info.getDetailedState().name();
                         logE("onReceive - Wifi State Name: " + wifiStateName);
                         tv_wifi_state.setText(wifiStateName);
+                        /*
+                        WIFI 连接的状态顺序
+                        info.getDetailedState()
+                        DISCONNECTED
+                        OBTAINING_IPADDR
+                        VERIFYING_POOR_LINK
+                        CAPTIVE_PORTAL_CHECK
+                        CONNECTED or FAILED
+
+                        info.getState()
+                        DISCONNECTED
+                        CONNECTING
+                        CONNECTED
+                         */
                         /*NetworkInfo.DetailedState state = info.getDetailedState();
                         if (state == NetworkInfo.DetailedState.CONNECTING) {
-                            //connectWifiListener.showState("连接中...");
+                            //tv_wifi_state.setText("连接中...");
                         } else if (state == NetworkInfo.DetailedState.AUTHENTICATING) {
-                            //connectWifiListener.showState("正在验证身份信息...");
+                            //tv_wifi_state.setText("正在验证身份信息...");
                         } else if (state == NetworkInfo.DetailedState.OBTAINING_IPADDR) {
-                            //connectWifiListener.showState("正在获取IP地址...");
+                            //tv_wifi_state.setText("正在获取IP地址...");
                         } else if (state == NetworkInfo.DetailedState.FAILED) {
-                            //connectWifiListener.showState("连接失败，点击任意地方关闭");
+                            //tv_wifi_state.setText("连接失败，点击任意地方关闭");
                         }*/
 
                         if (NetworkInfo.State.CONNECTED == info.getState()) {
