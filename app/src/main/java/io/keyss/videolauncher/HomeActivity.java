@@ -197,10 +197,10 @@ public class HomeActivity extends Activity {
                 isMainStart = true;
                 // [Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 1]
                 //executorService.shutdownNow();
-                Intent init = new Intent(Intent.ACTION_VIEW, Uri.parse("video://init"));
+                Intent startIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("video://start"));
                 try {
-                    logE("启动APP: " + init);
-                    startActivity(init);
+                    logE("启动APP: " + startIntent);
+                    startActivity(startIntent);
                 } catch (Exception e) {
                     // ActivityNotFoundException
                     e.printStackTrace();
