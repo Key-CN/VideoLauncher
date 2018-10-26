@@ -83,8 +83,11 @@ public class HomeActivity extends Activity {
 
     private void initView() {
         setContentView(R.layout.activity_home);
-        ScreenTool.hideNavbar(this);
-        //ScreenTool.showNavbar(this);
+        if (BuildConfig.DEBUG) {
+            ScreenTool.showNavbar(this);
+        } else {
+            ScreenTool.hideNavbar(this);
+        }
         start = findViewById(R.id.b_start);
         tv_wifi = findViewById(R.id.tv_wifi);
         tv_wifi_rssi = findViewById(R.id.tv_wifi_rssi);
