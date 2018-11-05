@@ -21,7 +21,6 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,7 +32,6 @@ import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
@@ -54,19 +52,14 @@ public class HomeActivity extends Activity {
     private Date END_TIME;
 
     private Button start;
-    private ImageView iv_wifi;
     private TextView tv_wifi;
-    private TextView tv_wifi_rssi;
-    private TextView tv_wifi_speed;
-    private TextView tv_wifi_state;
-    private TextView tv_ip;
+    private TextView tv_work_time;
     private ProgressDialog dialog;
 
 
     private boolean isMainStart;
     private boolean isActivityVisible;
     private boolean isSearching;
-    private Calendar calendar;
     private ExecutorService executorService;
     private WifiManager wifiManager;
     private boolean isFirstStart = true;
@@ -79,7 +72,6 @@ public class HomeActivity extends Activity {
         super.onCreate(savedInstanceState);
         TAG = getLocalClassName();
         logE("HomeActivity onCreate 开始初始化");
-        initTime();
         initView();
         initNetwork();
         executorService = Executors.newCachedThreadPool();
@@ -94,38 +86,41 @@ public class HomeActivity extends Activity {
     }
 
     private void initTime() {
-        DateFormat todayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.SIMPLIFIED_CHINESE);
-        String today = todayFormat.format(new Date());
-
-        DateFormat workFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm:ss", Locale.SIMPLIFIED_CHINESE);
+        // 先设置默认值，省的多种判断后添加
+        setDefaultTime();
 
         if (getWorkTimeFile().exists()) {
+            DateFormat workFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm:ss", Locale.SIMPLIFIED_CHINESE);
+            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.SIMPLIFIED_CHINESE).format(new Date());
             try {
                 BufferedReader reader = new BufferedReader(new FileReader(getWorkTimeFile()));
                 String time = reader.readLine();
                 reader.close();
-                if (!TextUtils.isEmpty(time)) {
+                if (!TextUtils.isEmpty(time) && time.contains(":") && time.contains("-")) {
                     // 08:00:00-18:30:00
                     String[] split = time.split("-");
-
                     START_TIME = workFormat.parse(today + split[0]);
                     END_TIME = workFormat.parse(today + split[1]);
-                } else {
-                    START_TIME = workFormat.parse(today + "07:30:00");
-                    END_TIME = workFormat.parse(today + "18:30:00");
                 }
             } catch (IOException | ParseException e) {
                 e.printStackTrace();
-                START_TIME = new Date();
-                START_TIME.setHours(7);
-                START_TIME.setMinutes(30);
-                START_TIME.setSeconds(0);
-                END_TIME = new Date();
-                END_TIME.setHours(18);
-                END_TIME.setMinutes(30);
-                END_TIME.setSeconds(0);
             }
         }
+        DateFormat workFormat = new SimpleDateFormat("HH:mm", Locale.SIMPLIFIED_CHINESE);
+        String workTimeText = "工作时间:  " + workFormat.format(START_TIME) + " - " + workFormat.format(END_TIME);
+        logE(workTimeText);
+        tv_work_time.setText(workTimeText);
+    }
+
+    private void setDefaultTime() {
+        START_TIME = new Date();
+        START_TIME.setHours(7);
+        START_TIME.setMinutes(30);
+        START_TIME.setSeconds(0);
+        END_TIME = new Date();
+        END_TIME.setHours(18);
+        END_TIME.setMinutes(30);
+        END_TIME.setSeconds(0);
     }
 
     private void initView() {
@@ -137,12 +132,8 @@ public class HomeActivity extends Activity {
         }
         start = findViewById(R.id.b_start);
         tv_wifi = findViewById(R.id.tv_wifi);
-        tv_wifi_rssi = findViewById(R.id.tv_wifi_rssi);
-        tv_wifi_speed = findViewById(R.id.tv_wifi_speed);
-        tv_wifi_state = findViewById(R.id.tv_wifi_state);
-        tv_ip = findViewById(R.id.tv_ip);
-        iv_wifi = findViewById(R.id.iv_wifi);
-        iv_wifi.setOnClickListener(v -> startActivityForResult(new Intent(Settings.ACTION_WIFI_SETTINGS)
+        tv_work_time = findViewById(R.id.tv_work_time);
+        tv_wifi.setOnClickListener(v -> startActivityForResult(new Intent(Settings.ACTION_WIFI_SETTINGS)
                 .putExtra("wifi_enable_next_on_connect", true) //是否打开网络连接检测功能（如果连上wifi，则下一步按钮可被点击）
                 .putExtra("extra_prefs_show_button_bar", true)
                 .putExtra("extra_prefs_set_next_text", "完成")
@@ -198,9 +189,7 @@ public class HomeActivity extends Activity {
                 if (WifiManager.NETWORK_STATE_CHANGED_ACTION.equals(intent.getAction())) {
                     NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
                     if (null != info) {
-                        String wifiStateName = info.getDetailedState().name();
-                        logE("onReceive - Wifi State Name: " + wifiStateName);
-                        tv_wifi_state.setText(wifiStateName);
+                        setWifiInfo();
                         /*
                         WIFI 连接的状态顺序
                         info.getDetailedState()
@@ -291,7 +280,7 @@ public class HomeActivity extends Activity {
 
             // 每次切换网络都需要设置默认网关
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
-            logE(gateway);
+            logE("设置查询到的网关: " + gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
             os.close();
@@ -311,30 +300,36 @@ public class HomeActivity extends Activity {
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
             os.close();
-            logE(gateway + "  Thread: " + Thread.currentThread().getName());
+            logE("单独设置网关: " + gateway);
         } catch (IOException e) {
             e.printStackTrace();
+            mFinishBridge = false;
         }
     }
 
     private void updateWifiInfo() {
         // 不一定是wifiInfo.getSupplicantState() == SupplicantState.COMPLETED，比如首次启动，还没有连接过WIFI，或者WIFI名字换了，搜索不到等
         if (isWifiAvailable) {
-            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-            tv_wifi_speed.setText(wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS);
-            tv_wifi.setText(wifiInfo.getSSID());
-            tv_wifi_rssi.setText(wifiInfo.getRssi() + "db");
-            tv_wifi_state.setText(wifiInfo.getSupplicantState().name());
-            tv_ip.setText(intToIp(wifiInfo.getIpAddress()));
+            setWifiInfo();
             // 检测后台程序，然后打开APP
             if (BuildConfig.DEBUG) {
-                Toast.makeText(this, "WIFI连接完成，debug版手动启动", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "WIFI已打开，debug版手动启动", Toast.LENGTH_SHORT).show();
             } else {
                 searchApp();
             }
         } else {
             Toast.makeText(this, "WIFI可能已损坏，请联系客服", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void setWifiInfo() {
+        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+        String text = wifiInfo.getSSID() + "\n"
+                + wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS + "\n"
+                + wifiInfo.getRssi() + "db\n"
+                + wifiInfo.getSupplicantState().name() + "\n"
+                + intToIp(wifiInfo.getIpAddress());
+        tv_wifi.setText(text);
     }
 
     private boolean isInSchoolTime() {
@@ -390,6 +385,7 @@ public class HomeActivity extends Activity {
         super.onResume();
         // 开启检测
         isActivityVisible = true;
+        initTime();
         if (!isSearching) {
             isSearching = true;
             executorService.execute(() -> {
@@ -399,12 +395,11 @@ public class HomeActivity extends Activity {
                         dialog.setMessage("正在启动中...");
                         dialog.show();
                     });
-                    SystemClock.sleep(8000);
+                    SystemClock.sleep(7000);
                     runOnUiThread(() -> dialog.setMessage("正在配置网络..."));
-                    logE("网络配置");
                     SystemClock.sleep(5000);
                     openWifiAdb();
-                    SystemClock.sleep(2000);
+                    SystemClock.sleep(1000);
                     runOnUiThread(dialog::dismiss);
                 }
                 while (isActivityVisible) {
