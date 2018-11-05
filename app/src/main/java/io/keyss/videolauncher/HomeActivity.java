@@ -14,18 +14,28 @@ import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -38,9 +48,10 @@ import io.keyss.videolauncher.utils.ScreenTool;
 public class HomeActivity extends Activity {
 
     private String TAG;
-    private static final String APP_PACKAGE_NAME = "io.keyss.microbeanandroid";
-    private static final int START_TIME = 8;
-    private static final int END_TIME = 18;
+    private final String APP_PACKAGE_NAME = "io.keyss.microbeanandroid";
+    // TODO 动态时间
+    private Date START_TIME;
+    private Date END_TIME;
 
     private Button start;
     private ImageView iv_wifi;
@@ -68,6 +79,7 @@ public class HomeActivity extends Activity {
         super.onCreate(savedInstanceState);
         TAG = getLocalClassName();
         logE("HomeActivity onCreate 开始初始化");
+        initTime();
         initView();
         initNetwork();
         executorService = Executors.newCachedThreadPool();
@@ -79,6 +91,41 @@ public class HomeActivity extends Activity {
             onActivityInitialized();
             return false;
         });
+    }
+
+    private void initTime() {
+        DateFormat todayFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.SIMPLIFIED_CHINESE);
+        String today = todayFormat.format(new Date());
+
+        DateFormat workFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm:ss", Locale.SIMPLIFIED_CHINESE);
+
+        if (getWorkTimeFile().exists()) {
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(getWorkTimeFile()));
+                String time = reader.readLine();
+                reader.close();
+                if (!TextUtils.isEmpty(time)) {
+                    // 08:00:00-18:30:00
+                    String[] split = time.split("-");
+
+                    START_TIME = workFormat.parse(today + split[0]);
+                    END_TIME = workFormat.parse(today + split[1]);
+                } else {
+                    START_TIME = workFormat.parse(today + "07:30:00");
+                    END_TIME = workFormat.parse(today + "18:30:00");
+                }
+            } catch (IOException | ParseException e) {
+                e.printStackTrace();
+                START_TIME = new Date();
+                START_TIME.setHours(7);
+                START_TIME.setMinutes(30);
+                START_TIME.setSeconds(0);
+                END_TIME = new Date();
+                END_TIME.setHours(18);
+                END_TIME.setMinutes(30);
+                END_TIME.setSeconds(0);
+            }
+        }
     }
 
     private void initView() {
@@ -291,11 +338,8 @@ public class HomeActivity extends Activity {
     }
 
     private boolean isInSchoolTime() {
-        if (calendar == null) {
-            calendar = Calendar.getInstance();
-        }
-        int hour = calendar.get(Calendar.HOUR_OF_DAY);
-        return hour >= START_TIME && hour < END_TIME;
+        Date now = new Date();
+        return now.after(START_TIME) && now.before(END_TIME);
     }
 
     public void searchApp() {
@@ -392,7 +436,7 @@ public class HomeActivity extends Activity {
     }
 
 
-    public String intToIp(int ipInt) {
+    private String intToIp(int ipInt) {
         StringBuilder sb = new StringBuilder();
         sb.append(ipInt & 0xFF).append(".");
         sb.append((ipInt >> 8) & 0xFF).append(".");
@@ -403,5 +447,17 @@ public class HomeActivity extends Activity {
 
     private void logE(String msg) {
         Log.e(TAG, "Thread: " + Thread.currentThread().getName() + "  msg: " + msg);
+    }
+
+    private File getWorkTimeFile() {
+        return new File(getWriteFolder(), "WorkTime.txt");
+    }
+
+    private File getWriteFolder() {
+        File file = new File(Environment.getExternalStorageDirectory(), "MicroBean");
+        if (!file.exists()) {
+            file.mkdirs();
+        }
+        return file;
     }
 }
