@@ -47,7 +47,7 @@ public class HomeActivity extends Activity {
 
     private String TAG;
     private final String APP_PACKAGE_NAME = "io.keyss.microbeanandroid";
-    // TODO 动态时间
+    // 动态获取工作时间
     private Date START_TIME;
     private Date END_TIME;
 
@@ -89,12 +89,15 @@ public class HomeActivity extends Activity {
         // 先设置默认值，省的多种判断后添加
         setDefaultTime();
 
+        logE("file: " + getWorkTimeFile().exists());
+
         if (getWorkTimeFile().exists()) {
             DateFormat workFormat = new SimpleDateFormat("yyyy-MM-ddHH:mm:ss", Locale.SIMPLIFIED_CHINESE);
             String today = new SimpleDateFormat("yyyy-MM-dd", Locale.SIMPLIFIED_CHINESE).format(new Date());
             try {
                 BufferedReader reader = new BufferedReader(new FileReader(getWorkTimeFile()));
                 String time = reader.readLine();
+                logE("读到的文本: " + time);
                 reader.close();
                 if (!TextUtils.isEmpty(time) && time.contains(":") && time.contains("-")) {
                     // 08:00:00-18:30:00
