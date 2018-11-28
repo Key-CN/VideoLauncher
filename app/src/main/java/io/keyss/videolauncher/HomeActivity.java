@@ -56,7 +56,6 @@ public class HomeActivity extends Activity {
     private TextView tv_work_time;
     private ProgressDialog dialog;
 
-
     private boolean isMainStart;
     private boolean isActivityVisible;
     private boolean isSearching;
@@ -166,8 +165,6 @@ public class HomeActivity extends Activity {
      * 172.28.128.128 IPC
      */
     private void initNetwork() {
-        // TODO 打开有线网络，并配置不常用IP段
-        // EthernetManager mEthManager = (EthernetManager) getApplicationContext().getSystemService(Context.ETHERNET_SERVICE);
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         /*if (wifiManager != null) {
             if (!wifiManager.isWifiEnabled()) {
@@ -179,7 +176,7 @@ public class HomeActivity extends Activity {
             isWifiAvailable = false;
         }*/
 
-        // 1行顶9行示范
+        // 上方 1行顶9行示范
         isWifiAvailable = wifiManager != null && (wifiManager.isWifiEnabled() || wifiManager.setWifiEnabled(true));
 
         IntentFilter filter = new IntentFilter();
@@ -280,6 +277,9 @@ public class HomeActivity extends Activity {
             os.write("iptables --table nat --append POSTROUTING --out-interface wlan0 -j MASQUERADE\n".getBytes());
             os.write("iptables --append FORWARD --in-interface eth0 -j ACCEPT\n".getBytes());
             os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
+
+            // 设置网卡IP
+            os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.255.0\n".getBytes());
 
             // 每次切换网络都需要设置默认网关
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
