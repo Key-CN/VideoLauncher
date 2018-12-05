@@ -268,6 +268,7 @@ public class HomeActivity extends Activity {
             os.write("stop adbd\n".getBytes());
             os.write("start adbd\n".getBytes());
             //os.write("adb tcpip 5555\n".getBytes());
+            SystemClock.sleep(10);
 
             // 一次启动生效整个生命周期
             os.write("iptables --flush\n".getBytes());
@@ -277,17 +278,22 @@ public class HomeActivity extends Activity {
             os.write("iptables --table nat --append POSTROUTING --out-interface wlan0 -j MASQUERADE\n".getBytes());
             os.write("iptables --append FORWARD --in-interface eth0 -j ACCEPT\n".getBytes());
             os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
+            SystemClock.sleep(10);
 
             // 设置网卡IP
-            os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.255.0\n".getBytes());
+            os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.0.0\n".getBytes());
+            SystemClock.sleep(10);
 
             // 每次切换网络都需要设置默认网关
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
             logE("设置查询到的网关: " + gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
+            SystemClock.sleep(10);
+            // 退出
+            os.write("exit\n".getBytes());
             os.close();
-
+            exec.destroy();
             mFinishBridge = true;
             logE("双网卡桥接成功");
         } catch (IOException e) {
