@@ -216,7 +216,7 @@ public class HomeActivity extends Activity {
                         }*/
 
                         if (NetworkInfo.State.CONNECTED == info.getState()) {
-                            addGateway();
+                            executorService.execute(() -> addGateway());
                         }
                     }
                 }
@@ -233,19 +233,37 @@ public class HomeActivity extends Activity {
     private void startMainApp() {
         if (isWifiAvailable) {
             if (!isMainStart) {
-                isMainStart = true;
-                // [Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 1]
-                //executorService.shutdownNow();
-                Intent startIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("video://start"));
-                try {
-                    logE("启动APP: " + startIntent);
-                    startActivity(startIntent);
-                } catch (Exception e) {
-                    // ActivityNotFoundException
-                    e.printStackTrace();
-                    logE("error: " + e.getLocalizedMessage());
+                if (mFinishBridge) {
+                    isMainStart = true;
+                    // [Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 1]
+                    //executorService.shutdownNow();
+                    Intent startIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("video://start"));
+                    try {
+                        logE("启动APP: " + startIntent);
+                        ActivityManager am = ((ActivityManager) getSystemService(Context.ACTIVITY_SERVICE));
+                        if (null != am) {
+                            /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
+                            for (ActivityManager.RunningAppProcessInfo info : processInfos) {
+                                if (APP_PACKAGE_NAME.equals(info.processName)) {
+                                    // 杀掉后启动
+                                    logE("杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
+                                    am.killBackgroundProcesses(info.processName);
+                                    SystemClock.sleep(1000);
+                                    break;
+                                }
+                            }*/
+                            am.killBackgroundProcesses(APP_PACKAGE_NAME);
+                        }
+                        startActivity(startIntent);
+                    } catch (Exception e) {
+                        // ActivityNotFoundException
+                        e.printStackTrace();
+                        logE("error: " + e.getLocalizedMessage());
+                    }
+                    isMainStart = false;
+                } else {
+                    Toast.makeText(this, "请等待网络配置完成后启动", Toast.LENGTH_SHORT).show();
                 }
-                isMainStart = false;
             } else {
                 Toast.makeText(this, "正在启动中，请稍等", Toast.LENGTH_SHORT).show();
             }
@@ -289,7 +307,6 @@ public class HomeActivity extends Activity {
 
             // 每次切换网络都需要设置默认网关
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
-            logE("设置查询到的网关: " + gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
             SystemClock.sleep(100);
@@ -298,7 +315,7 @@ public class HomeActivity extends Activity {
             os.close();
             exec.destroy();
             mFinishBridge = true;
-            logE("双网卡桥接成功");
+            logE("设置查询到的网关: " + gateway + "  双网卡桥接成功");
         } catch (IOException e) {
             e.printStackTrace();
             mFinishBridge = false;
@@ -311,10 +328,14 @@ public class HomeActivity extends Activity {
             OutputStream os = exec.getOutputStream();
             // 设置网卡IP
             os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.0.0\n".getBytes());
+            SystemClock.sleep(10);
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
+            SystemClock.sleep(100);
             os.write("exit\n".getBytes());
+            SystemClock.sleep(10);
             os.close();
+            SystemClock.sleep(10);
             exec.destroy();
             mFinishBridge = true;
             logE("单独设置网关: " + gateway);
@@ -332,7 +353,7 @@ public class HomeActivity extends Activity {
             if (BuildConfig.DEBUG) {
                 Toast.makeText(this, "WIFI已打开，debug版手动启动", Toast.LENGTH_SHORT).show();
             } else {
-                searchApp();
+                autoStartApp();
             }
         } else {
             Toast.makeText(this, "WIFI可能已损坏，请联系客服", Toast.LENGTH_SHORT).show();
@@ -354,29 +375,9 @@ public class HomeActivity extends Activity {
         return now.after(START_TIME) && now.before(END_TIME);
     }
 
-    public void searchApp() {
+    public void autoStartApp() {
         if (isInSchoolTime()) {
-            if (mFinishBridge) {
-                ActivityManager am = ((ActivityManager) getSystemService(Context.ACTIVITY_SERVICE));
-                if (null != am) {
-                /*List<ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
-                for (ActivityManager.RunningAppProcessInfo info : processInfos) {
-                    if (APP_PACKAGE_NAME.equals(info.processName)) {
-                        // 杀掉后启动
-                        logE("杀掉: " + info.processName + "  pid: " + info.pid + "  uid: " + info.uid);
-                        am.killBackgroundProcesses(info.processName);
-                        SystemClock.sleep(1000);
-                        break;
-                    }
-                }*/
-                    am.killBackgroundProcesses(APP_PACKAGE_NAME);
-                    startMainApp();
-                } else {
-                    startMainApp();
-                }
-            } else {
-                Toast.makeText(this, "请等待网络配置完成后启动", Toast.LENGTH_SHORT).show();
-            }
+            startMainApp();
         } else {
             Toast.makeText(this, "非上学时间暂停自动启动", Toast.LENGTH_SHORT).show();
         }
