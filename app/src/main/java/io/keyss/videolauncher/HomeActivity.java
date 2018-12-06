@@ -262,10 +262,13 @@ public class HomeActivity extends Activity {
             /*String cmd = "su\nsetprop service.adb.tcp.port 5555\nstop adbd\nstart adbd\n";
             Runtime.getRuntime().exec(cmd);*/
             Process exec = Runtime.getRuntime().exec("su");
+            SystemClock.sleep(10);
             // su root 环境继续输入
             OutputStream os = exec.getOutputStream();
             os.write("setprop service.adb.tcp.port 5555\n".getBytes());
+            SystemClock.sleep(10);
             os.write("stop adbd\n".getBytes());
+            SystemClock.sleep(10);
             os.write("start adbd\n".getBytes());
             //os.write("adb tcpip 5555\n".getBytes());
             SystemClock.sleep(10);
@@ -289,7 +292,7 @@ public class HomeActivity extends Activity {
             logE("设置查询到的网关: " + gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
 
-            SystemClock.sleep(10);
+            SystemClock.sleep(100);
             // 退出
             os.write("exit\n".getBytes());
             os.close();
@@ -306,9 +309,14 @@ public class HomeActivity extends Activity {
         try {
             Process exec = Runtime.getRuntime().exec("su");
             OutputStream os = exec.getOutputStream();
+            // 设置网卡IP
+            os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.0.0\n".getBytes());
             String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
+            os.write("exit\n".getBytes());
             os.close();
+            exec.destroy();
+            mFinishBridge = true;
             logE("单独设置网关: " + gateway);
         } catch (IOException e) {
             e.printStackTrace();
