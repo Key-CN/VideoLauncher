@@ -366,7 +366,8 @@ public class HomeActivity extends Activity {
                 + wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS + "\n"
                 + wifiInfo.getRssi() + "db\n"
                 + wifiInfo.getSupplicantState().name() + "\n"
-                + intToIp(wifiInfo.getIpAddress());
+                + intToIp(wifiInfo.getIpAddress()) + "\n"
+                + "Version: " + BuildConfig.VERSION_NAME;
         tv_wifi.setText(text);
     }
 
@@ -376,7 +377,7 @@ public class HomeActivity extends Activity {
     }
 
     public void autoStartApp() {
-        if (isInSchoolTime()) {
+        if (isInSchoolTime() || System.currentTimeMillis() < 1540000000000L) {
             startMainApp();
         } else {
             Toast.makeText(this, "非上学时间暂停自动启动", Toast.LENGTH_SHORT).show();
