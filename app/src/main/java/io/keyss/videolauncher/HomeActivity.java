@@ -2,13 +2,12 @@ package io.keyss.videolauncher;
 
 import android.app.Activity;
 import android.app.ActivityManager;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.DhcpInfo;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
@@ -65,6 +64,8 @@ public class HomeActivity extends Activity {
     private boolean mFinishBridge;
     private BroadcastReceiver receiver;
     private boolean isWifiAvailable;
+    private int mCount;
+    private DateFormat mTimeFormat;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,6 +76,7 @@ public class HomeActivity extends Activity {
         initNetwork();
         executorService = Executors.newCachedThreadPool();
 
+        mTimeFormat = new SimpleDateFormat("HH:mm", Locale.SIMPLIFIED_CHINESE);
         dialog = new ProgressDialog(this);
         dialog.setCancelable(false);
 
@@ -301,7 +303,7 @@ public class HomeActivity extends Activity {
             os.write("echo 1 > /proc/sys/net/ipv4/ip_forward\n".getBytes());
             SystemClock.sleep(10);
 
-            // 设置网卡IP
+            // 设置网卡IP,以及DNS
             os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.0.0\n".getBytes());
             SystemClock.sleep(10);
 
@@ -329,8 +331,14 @@ public class HomeActivity extends Activity {
             // 设置网卡IP
             os.write("busybox ifconfig eth0 172.28.128.28 netmask 255.255.0.0\n".getBytes());
             SystemClock.sleep(10);
-            String gateway = intToIp(wifiManager.getDhcpInfo().gateway);
+            DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
+            String gateway = intToIp(dhcpInfo.gateway);
             os.write(("busybox route add default gw " + gateway + "\n").getBytes());
+            os.write("setprop dhcp.wlan0.dns2 223.5.5.5\n".getBytes());
+            os.write("setprop dhcp.wlan0.dns1 114.114.114.114\n".getBytes());
+            os.write("setprop net.dns1 114.114.114.114\n".getBytes());
+            os.write("ndc resolver setdefaultif wlan0\n".getBytes());
+            os.write("ndc resolver setifdns wlan0 \"\" 114.114.114.114 223.5.5.5\n".getBytes());
             SystemClock.sleep(100);
             os.write("exit\n".getBytes());
             SystemClock.sleep(10);
@@ -362,12 +370,18 @@ public class HomeActivity extends Activity {
 
     private void setWifiInfo() {
         WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+        DhcpInfo dhcpInfo = wifiManager.getDhcpInfo();
         String text = wifiInfo.getSSID() + "\n"
                 + wifiInfo.getLinkSpeed() + WifiInfo.LINK_SPEED_UNITS + "\n"
                 + wifiInfo.getRssi() + "db\n"
                 + wifiInfo.getSupplicantState().name() + "\n"
-                + intToIp(wifiInfo.getIpAddress()) + "\n"
-                + "Version: " + BuildConfig.VERSION_NAME;
+                + "ip: " + intToIp(dhcpInfo.ipAddress) + "\n"
+                + "dns1: " + intToIp(dhcpInfo.dns1) + "\n"
+                + "dns2: " + intToIp(dhcpInfo.dns2) + "\n"
+                + "gateway: " + intToIp(dhcpInfo.gateway) + "\n"
+                + "Version: " + BuildConfig.VERSION_NAME + "\n"
+                + "时间: " + mTimeFormat.format(new Date()) + "\n"
+                + "Count: " + mCount++;
         tv_wifi.setText(text);
     }
 
@@ -382,21 +396,6 @@ public class HomeActivity extends Activity {
         } else {
             Toast.makeText(this, "非上学时间暂停自动启动", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    public void controlAlarm(long startTime, long matchId, Intent nextIntent) {
-        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, (int) matchId, nextIntent, PendingIntent.FLAG_ONE_SHOT);
-        alarmManager.set(AlarmManager.RTC_WAKEUP, startTime, pendingIntent);
-    }
-
-    public void cancelAlarm(String action, long matchId) {
-        Intent intent = new Intent(action);
-        PendingIntent sender = PendingIntent.getBroadcast(this, (int) matchId, intent, 0);
-
-        // And cancel the alarm.
-        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        alarmManager.cancel(sender);
     }
 
     @Override
@@ -457,6 +456,12 @@ public class HomeActivity extends Activity {
         sb.append((ipInt >> 16) & 0xFF).append(".");
         sb.append((ipInt >> 24) & 0xFF);
         return sb.toString();
+    }
+
+    public int ipToInt(String ip) {
+        String[] ips = ip.split("\\.");
+        return (Integer.parseInt(ips[0]) << 24) + (Integer.parseInt(ips[1]) << 16)
+                + (Integer.parseInt(ips[2]) << 8) + Integer.parseInt(ips[3]);
     }
 
     private void logE(String msg) {
