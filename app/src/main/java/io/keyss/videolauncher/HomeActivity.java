@@ -339,11 +339,11 @@ public class HomeActivity extends Activity {
             os.write("setprop net.dns1 114.114.114.114\n".getBytes());
             os.write("ndc resolver setdefaultif wlan0\n".getBytes());
             os.write("ndc resolver setifdns wlan0 \"\" 114.114.114.114 223.5.5.5\n".getBytes());
-            SystemClock.sleep(100);
+            SystemClock.sleep(80);
             os.write("exit\n".getBytes());
-            SystemClock.sleep(10);
+            SystemClock.sleep(20);
             os.close();
-            SystemClock.sleep(10);
+            SystemClock.sleep(20);
             exec.destroy();
             mFinishBridge = true;
             logE("单独设置网关: " + gateway);
